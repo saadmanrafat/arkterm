@@ -44,8 +44,8 @@ def process_single_query(query, config):
     save_to_history(query, response)
 
 def main():
-    parser = argparse.ArgumentParser(description="AI assistant in your terminal")
-    parser.add_argument('query', nargs='*', help='Query for the AI assistant')
+    parser = argparse.ArgumentParser(description="Shell Shocked: Wire an LLM Directly into Your Linux Terminal")
+    parser.add_argument('query', nargs='*', help='query LLM integrated terminal')
     parser.add_argument('-i', '--interactive', action='store_true', help='Start interactive mode')
     parser.add_argument('--history', action='store_true', help='Show query history')
     parser.add_argument('--setup', action='store_true', help='Run setup process')
