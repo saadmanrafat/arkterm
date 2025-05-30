@@ -1,6 +1,6 @@
 [project]
 name = "arkterm"
-version = "0.1.0-dev.1"
+version = "0.1.0-dev.2"
 description = "Shell Shocked: Wire an LLM Directly into Your Linux Terminal"
 authors = [{ name = "Saadman Rafat", email = "saadman@outlook.com" }]
 readme = "README.md"

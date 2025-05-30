@@ -57,6 +57,7 @@ def fetch_system_info() -> Dict[str, str]:
             "current_dir": os.getcwd(),
             "os": platform.system(),
             "shell": os.environ.get("SHELL", "unknown"),
+            "user": os.environ.get("USER", "unknown"),
         }
     except OSError as e:
         return {"error": str(e)}

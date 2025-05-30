@@ -1,12 +1,103 @@
+import os
+
 import requests
 from typing import Dict, Any, Optional
 from requests.exceptions import RequestException
 from .terminal_utils import fetch_system_info
 
 
-def get_ai_response(
-    query: str, config: Dict[str, Any], with_system_info: bool = True
-) -> str:
+def _detect_project_type(cwd: str) -> str:
+    """
+    Determines the type of project based on specific files found in the given directory. The function inspects
+    the contents of the provided directory and categorizes it as a specific project type or as a general
+    directory if no specific files are detected.
+
+    Args:
+        cwd: The current working directory to inspect. Must be a valid file path.
+
+    Returns:
+        A string indicating the type of project detected. Possible values include:
+        - "Node.js project detected"
+        - "Python project detected"
+        - "Rust project detected"
+        - "Go project detected"
+        - "Git repository detected"
+        - "General directory"
+    """
+
+    files = os.listdir(cwd) if os.path.exists(cwd) else []
+
+    if "package.json" in files:
+        return "Node.js project detected"
+    elif "requirements.txt" in files or "pyproject.toml" in files:
+        return "Python project detected"
+    elif "Cargo.toml" in files:
+        return "Rust project detected"
+    elif "go.mod" in files:
+        return "Go project detected"
+    elif ".git" in files:
+        return "Git repository detected"
+    else:
+        return "General directory"
+
+
+def get_enhanced_system_prompt(system_info: Dict[str, str]) -> str:
+    """
+    Generates an enhanced system prompt for an interactive Linux terminal AI agent,
+    integrating system context and safety guidelines for command execution.
+
+    This function assembles a detailed prompt by incorporating system information such as
+    current working directory, operating system, shell, and user. The prompt outlines the
+    capabilities, response guidelines, and safety rules the AI agent should adhere to, thereby
+    ensuring secure and efficient interaction.
+
+    Args:
+        system_info (Dict[str, str]): A dictionary containing system-related keys and values. Expected
+            keys include:
+                - 'current_dir': The current working directory.
+                - 'os': The operating system in use.
+                - 'shell': The shell runtime environment.
+                - 'user': The user executing the agent, where it defaults to "unknown" if not provided.
+
+    Returns:
+        str: The formatted prompt string incorporating system information and operational guidelines.
+    """
+
+    base_prompt: str = f"""
+        You are an interactive Linux terminal AI agent with direct command execution capabilities.
+        
+        CURRENT CONTEXT:
+        - Working Directory: {system_info['current_dir']}
+        - OS: {system_info['os']}
+        - Shell: {system_info['shell']}
+        - User: {system_info.get('user', 'unknown')}
+        
+        CAPABILITIES:
+        - Execute shell commands safely
+        - Analyze file contents and directory structures
+        - Provide system administration guidance
+        - Assist with development workflows
+        - Monitor system resources and processes
+        
+        RESPONSE GUIDELINES:
+        1. Be concise but thorough
+        2. Always explain what commands do before suggesting them
+        3. For potentially destructive operations, ask for explicit confirmation
+        4. Provide alternatives when possible
+        5. Use code blocks for commands: ```bash\ncommand here\n```
+        
+        SAFETY RULES:
+        - Never execute commands that could damage the system
+        - Always warn about destructive operations (rm -rf, format, etc.)
+        - Prefer safer alternatives (mv to trash vs rm, etc.)
+        - Ask before modifying system files or configurations
+        
+        Current project context: {_detect_project_type(system_info['current_dir'])}
+    """
+    return base_prompt
+
+
+def fetch_response(query: str, config: Dict[str, Any]) -> str:
     """
     Sends a query to a Groq API and returns the AI's response.
 
@@ -14,8 +105,6 @@ def get_ai_response(
         query: The user's query to send to the AI.
         config: A dictionary containing API configuration (key, model, base URL)
                 and settings (max_tokens).
-        with_system_info: If True, includes system information (OS, shell, CWD)
-                          in the prompt to the AI. Defaults to True.
 
     Returns:
         A string containing the AI's response, or an error message if the
@@ -26,67 +115,6 @@ def get_ai_response(
     api_base = config["API"].get("api_base", "https://api.groq.com/openai/v1")
     max_tokens: int = int(config["SETTINGS"].get("max_tokens", "2048"))
 
-    system_message: str = """
-                You are an AI assistant integrated into a Linux terminal.
-
-                You can execute commands and provide concise, accurate responses.
-                If the user asks for help, provide a brief overview of available commands.
-                If the user asks for system information, provide details about the current
-                working directory, operating system, and shell. When appropriate, suggest
-                commands that can help solve the user's problem.
-
-                Before executing any command, ensure it is safe and appropriate for the user's context.
-                Ask the user for confirmation if the command could potentially modify system state or data.
-
-                Here are the main areas you can assist with:
-
-                1. Project Management:
-                •  Initialize new projects
-                •  Setup development environments
-                •  Manage project dependencies
-                •  Configure build tools
-
-                2. System Operations:
-                •  Monitor processes
-                •  View system information
-                •  Manage services
-                •  Handle network operations
-
-                3. Package Management:
-                •  Install and update packages
-                •  Manage dependencies
-                •  Handle version conflicts
-
-                4. Version Control (Git):
-                •  View and manage commits
-                •  Branch operations
-                •  Handle merges and conflicts
-                •  Review changes
-                •  Manage remote repositories
-
-                5. File and Directory Operations:
-                •  Navigate directories
-                •  Create, read, modify, and delete files
-                •  Search for files and content
-                •  Manage file permissions
-
-                6. Command Execution:
-                You can execute commands and provide concise, accurate responses.
-                If the user asks for help, provide a brief overview of available commands.
-                If the user asks for system information, provide details about the current
-                working directory, operating system, and shell. When appropriate, suggest
-                commands that can help solve the user's problem.
-"""
-
-    if with_system_info:
-        system_info: Dict[str, str] = fetch_system_info()
-        system_message += f"""
-            Current context:
-            - Working directory: {system_info['current_dir']}
-            - Operating system: {system_info['os']}
-            - Shell: {system_info['shell']}
-            """
-
     headers: Dict[str, str] = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -95,10 +123,16 @@ def get_ai_response(
     payload: Dict[str, Any] = {
         "model": model,
         "messages": [
-            {"role": "system", "content": system_message},
+            {
+                "role": "system",
+                "content": get_enhanced_system_prompt(fetch_system_info()),
+            },
             {"role": "user", "content": query},
         ],
         "max_tokens": max_tokens,
+        "temperature": 0.7,  # Adjust temperature for response variability
+        "top_p": 0.95,  # Use top-p sampling
+        "reasoning_format": "parsed"
     }
 
     try:
@@ -117,37 +151,32 @@ def get_ai_response(
 
 
 def parse_command_blocks(response: str) -> list[str]:
-    """Parses a response string and extracts shell command blocks.
+    """
+    Parses command blocks enclosed in backticks from a given string.
 
-    Command blocks are identified by triple backticks, optionally followed by
-    language identifiers (e.g., 'bash', 'python').
+    This function iterates through the provided string, detects code blocks
+    enclosed by triple backticks, and extracts their contents. It maintains
+    a state to track whether the current line lies inside a code block.
+    Lines outside code blocks are ignored.
 
     Args:
-        response: The string to parse, which may contain command blocks.
+        response (str): The input string potentially containing code blocks.
 
     Returns:
-        A list of strings, where each string is a command block found in the
-        response. Returns an empty list if no command blocks are found.
+        list[str]: A list of strings, where each string is the content of a
+        code block extracted from the input.
     """
-    lines: list[str] = response.split("\n")
-    in_code_block: bool = False
-    command_blocks: list[str] = []
-    current_block: list[str] = []
+    command_blocks = []
+    current_block = []
+    in_code_block = False
 
-    for line in lines:
-        stripped_line = line.strip()
-        if stripped_line.startswith("```"):
-            if not in_code_block:  # Opening fence
-                in_code_block = True
-                # current_block is implicitly empty from previous block's close or initialization
-            else:  # Closing fence
-                in_code_block = False
-                if current_block:  # If there was content
-                    command_blocks.append("\n".join(current_block))
-                current_block = (
-                    []
-                )  # Reset for the next potential block or if this block was empty
+    for line in response.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            if not in_code_block and current_block:
+                command_blocks.append("\n".join(current_block))
+                current_block.clear()
         elif in_code_block:
-            current_block.append(line)  # Add content lines
-
+            current_block.append(line)
     return command_blocks

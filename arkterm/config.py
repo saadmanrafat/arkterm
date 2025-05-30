@@ -4,6 +4,12 @@ import json
 import sys
 from typing import Dict, Any, List, TypedDict
 
+from rich.console import Console
+
+from .palette import GITHUB_DARK_THEME
+
+console = Console(theme=GITHUB_DARK_THEME)
+
 CONFIG_FILE: str = os.path.expanduser("~/.aiterm/config.yaml")  # Changed to .yaml
 HISTORY_FILE: str = os.path.expanduser("~/.aiterm/history.json")
 
