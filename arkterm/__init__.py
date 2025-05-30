@@ -11,4 +11,4 @@ if sys.version_info <= (3, 9):
     print("This package requires Python 3.10 or higher.", file=sys.stderr)
     sys.exit(1)
 
-__version__ = "0.1.0-dev.1"
+__version__ = "0.1.0-dev.2"
