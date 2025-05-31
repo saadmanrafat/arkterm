@@ -85,28 +85,27 @@ def main():
 
     args = parser.parse_args()
 
-    if args.help:
-        display_help()
-        return
-
-    if args.setup:
-        handle_setup()
-        return
-
-    # Setup config if not already set up
-    setup_config(console)
-    config = load_config()
-
-    if args.history:
-        display_history()
-        return
-
-    if args.interactive:
-        run_interactive_mode(config)
-        return
-
-    if args.query:
-        query = ' '.join(args.query)
-        process_single_query(query, config)
-    else:
-        display_help()
+    match True:
+        case _ if args.help:
+            display_help()
+            return
+        case _ if args.setup:
+            handle_setup()
+            return
+        case _ if args.history:
+            display_history()
+            return
+        case _ if args.interactive:
+            # Setup config if not already set up
+            setup_config(console)
+            config = load_config()
+            run_interactive_mode(config)
+            return
+        case _ if args.query:
+            # Setup config if not already set up
+            setup_config(console)
+            config = load_config()
+            query = ' '.join(args.query)
+            process_single_query(query, config)
+        case _:
+            display_help()
