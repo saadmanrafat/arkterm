@@ -32,7 +32,7 @@ def execute_command(command: str) -> str:
             shell=True,
             check=True,
             text=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
         return result.stdout
